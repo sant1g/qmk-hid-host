@@ -20,6 +20,14 @@ pub struct Device {
     pub usage: Option<u16>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub usage_page: Option<u16>,
+    pub encoders: Vec<Encoder>,
+}
+
+#[derive(serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Encoder {
+    pub index: u8,
+    pub modes: Vec<String>,
 }
 
 static CONFIG: OnceLock<Config> = OnceLock::new();
@@ -39,6 +47,10 @@ pub fn load_config(path: PathBuf) -> &'static Config {
             product_id: 0x0844,
             usage: None,
             usage_page: None,
+            encoders: vec![Encoder {
+                index: 0,
+                modes: vec!["VOL".to_string()],
+            }],
         }],
         layouts: vec!["en".to_string()],
         reconnect_delay: None,

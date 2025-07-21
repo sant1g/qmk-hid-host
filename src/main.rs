@@ -5,20 +5,22 @@
 
 mod config;
 mod data_type;
+mod encoder_mode;
 mod keyboard;
 mod providers;
 
 use config::load_config;
 use keyboard::Keyboard;
-use providers::{_base::Provider, layout::LayoutProvider, relay::RelayProvider, time::TimeProvider, volume::VolumeProvider};
+use providers::{
+    _base::Provider, date::DateProvider, layout::LayoutProvider, media::MediaProvider, relay::RelayProvider, time::TimeProvider,
+    volume::VolumeProvider,
+};
 use tokio::sync::{broadcast, mpsc};
-
-#[cfg(not(target_os = "macos"))]
-use providers::media::MediaProvider;
 
 #[cfg(target_os = "macos")]
 use core_foundation_sys::runloop::CFRunLoopRun;
 
+use crate::providers::system::SystemProvider;
 use clap::Parser;
 
 #[derive(Parser, Debug)]
@@ -53,7 +55,6 @@ fn main() {
     run(host_to_device_sender, device_to_host_sender, is_connected_receiver);
 }
 
-#[cfg(not(target_os = "macos"))]
 fn get_providers(
     host_to_device_sender: &broadcast::Sender<Vec<u8>>,
     device_to_host_sender: &broadcast::Sender<Vec<u8>>,
@@ -63,19 +64,8 @@ fn get_providers(
         VolumeProvider::new(host_to_device_sender.clone()),
         LayoutProvider::new(host_to_device_sender.clone()),
         MediaProvider::new(host_to_device_sender.clone()),
-        RelayProvider::new(host_to_device_sender.clone(), device_to_host_sender.clone()),
-    ];
-}
-
-#[cfg(target_os = "macos")]
-fn get_providers(
-    host_to_device_sender: &broadcast::Sender<Vec<u8>>,
-    device_to_host_sender: &broadcast::Sender<Vec<u8>>,
-) -> Vec<Box<dyn Provider>> {
-    return vec![
-        TimeProvider::new(host_to_device_sender.clone()),
-        VolumeProvider::new(host_to_device_sender.clone()),
-        LayoutProvider::new(host_to_device_sender.clone()),
+        DateProvider::new(host_to_device_sender.clone()),
+        SystemProvider::new(host_to_device_sender.clone()),
         RelayProvider::new(host_to_device_sender.clone(), device_to_host_sender.clone()),
     ];
 }
