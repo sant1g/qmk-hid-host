@@ -8,6 +8,7 @@ mod data_type;
 mod encoder_mode;
 mod keyboard;
 mod providers;
+mod consumers;
 
 use config::load_config;
 use keyboard::Keyboard;
@@ -22,6 +23,8 @@ use core_foundation_sys::runloop::CFRunLoopRun;
 
 use crate::providers::system::SystemProvider;
 use clap::Parser;
+use crate::consumers::_base::Consumer;
+use crate::consumers::encoder::EncoderConsumer;
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -70,6 +73,14 @@ fn get_providers(
     ];
 }
 
+fn get_consumers(
+    device_to_host_sender: &broadcast::Sender<Vec<u8>>,
+) -> Vec<Box<dyn Consumer>> {
+    return vec![
+        EncoderConsumer::new(device_to_host_sender.clone()),
+    ];
+}
+
 #[cfg(not(target_os = "macos"))]
 fn run(
     host_to_device_sender: broadcast::Sender<Vec<u8>>,
@@ -99,6 +110,7 @@ fn start(
     mut is_connected_receiver: mpsc::Receiver<bool>,
 ) {
     let providers = get_providers(&host_to_device_sender, &device_to_host_sender);
+    let consumers = get_consumers(&device_to_host_sender);
 
     let mut connected_count = 0;
     let mut is_started = false;
@@ -113,6 +125,7 @@ fn start(
                 tracing::info!("Stopping providers");
                 is_started = false;
                 providers.iter().for_each(|p| p.stop());
+                consumers.iter().for_each(|p| p.stop());
                 std::thread::sleep(std::time::Duration::from_millis(200));
             }
 
@@ -120,6 +133,7 @@ fn start(
                 tracing::info!("Starting providers");
                 is_started = true;
                 providers.iter().for_each(|p| p.start());
+                consumers.iter().for_each(|p| p.start());
             }
         }
     }

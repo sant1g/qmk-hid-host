@@ -15,12 +15,6 @@ pub struct Keyboard {
     usage_page: u16,
     reconnect_delay: u64,
     is_connected: Arc<AtomicBool>,
-    encoders: Vec<Encoder>,
-}
-
-pub struct Encoder {
-    index: u8,
-    modes: Vec<String>,
 }
 
 impl Keyboard {
@@ -32,14 +26,6 @@ impl Keyboard {
             usage_page: device.usage_page.unwrap_or(0xff60),
             reconnect_delay,
             is_connected: Arc::new(AtomicBool::new(false)),
-            encoders: device
-                .encoders
-                .iter()
-                .map(|e| Encoder {
-                    index: e.index,
-                    modes: e.modes.clone(),
-                })
-                .collect(),
         };
     }
 
@@ -88,30 +74,7 @@ impl Keyboard {
                     loop {
                         match device_info.open_device(&hid_api) {
                             Ok(device) => {
-                                let name = name.clone();
-                                let is_connected = is_connected.clone();
-                                let device_to_host_sender = device_to_host_sender.clone();
-                                let mut data = [0u8; 32];
-                                std::thread::spawn(move || loop {
-                                    tracing::debug!("{}: waiting for data from keyboard...", name);
-                                    std::thread::sleep(std::time::Duration::from_millis(10)); // lowers host CPU usage by order of magnitude
-
-                                    if let Ok(result) = device.read(data.as_mut()) {
-                                        tracing::info!("{}: received {:?}", name, data);
-                                        if result > 0 {
-                                            if data[0] == DataType::RelayFromDevice as u8 {
-                                                let _ = device_to_host_sender.send(data.to_vec());
-                                            }
-                                            if data[0] == DataType::EncoderMode as u8 {
-                                                let encs = &self.encoders;
-                                                Command::new("media-control").arg("get").output().unwrap().stdout;
-                                            }
-                                        }
-                                    } else {
-                                        is_connected.store(false, Relaxed);
-                                        break;
-                                    }
-                                });
+                                start_read(&name, device, &is_connected, &device_to_host_sender);
                                 break;
                             }
                             Err(err) => tracing::error!("{}", err),
@@ -158,6 +121,27 @@ fn start_write(name: &String, device: HidDevice, is_connected: &Arc<AtomicBool>,
                 is_connected.store(false, Relaxed);
                 break;
             }
+        }
+    });
+}
+
+fn start_read(name: &String, device: HidDevice, is_connected: &Arc<AtomicBool>, device_to_host_sender: &broadcast::Sender<Vec<u8>>) {
+    let name = name.clone();
+    let is_connected = is_connected.clone();
+    let device_to_host_sender = device_to_host_sender.clone();
+    let mut data = [0u8; 32];
+    std::thread::spawn(move || loop {
+        tracing::debug!("{}: waiting for data from keyboard...", name);
+        std::thread::sleep(std::time::Duration::from_millis(10)); // lowers host CPU usage by order of magnitude
+
+        if let Ok(result) = device.read(data.as_mut()) {
+            tracing::debug!("{}: received {:?}", name, data);
+            if result > 0 {
+                let _ = device_to_host_sender.send(data.to_vec());
+            }
+        } else {
+            is_connected.store(false, Relaxed);
+            break;
         }
     });
 }
