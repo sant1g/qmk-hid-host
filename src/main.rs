@@ -5,21 +5,26 @@
 
 mod config;
 mod data_type;
+mod encoder_mode;
 mod keyboard;
 mod providers;
+mod consumers;
 
 use config::load_config;
 use keyboard::Keyboard;
-use providers::{_base::Provider, layout::LayoutProvider, relay::RelayProvider, time::TimeProvider, volume::VolumeProvider};
+use providers::{
+    _base::Provider, date::DateProvider, layout::LayoutProvider, media::MediaProvider, relay::RelayProvider, time::TimeProvider,
+    volume::VolumeProvider,
+};
 use tokio::sync::{broadcast, mpsc};
-
-#[cfg(not(target_os = "macos"))]
-use providers::media::MediaProvider;
 
 #[cfg(target_os = "macos")]
 use core_foundation_sys::runloop::CFRunLoopRun;
 
+use crate::providers::system::SystemProvider;
 use clap::Parser;
+use crate::consumers::_base::Consumer;
+use crate::consumers::encoder::EncoderConsumer;
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -53,7 +58,6 @@ fn main() {
     run(host_to_device_sender, device_to_host_sender, is_connected_receiver);
 }
 
-#[cfg(not(target_os = "macos"))]
 fn get_providers(
     host_to_device_sender: &broadcast::Sender<Vec<u8>>,
     device_to_host_sender: &broadcast::Sender<Vec<u8>>,
@@ -63,20 +67,17 @@ fn get_providers(
         VolumeProvider::new(host_to_device_sender.clone()),
         LayoutProvider::new(host_to_device_sender.clone()),
         MediaProvider::new(host_to_device_sender.clone()),
+        DateProvider::new(host_to_device_sender.clone()),
+        SystemProvider::new(host_to_device_sender.clone()),
         RelayProvider::new(host_to_device_sender.clone(), device_to_host_sender.clone()),
     ];
 }
 
-#[cfg(target_os = "macos")]
-fn get_providers(
-    host_to_device_sender: &broadcast::Sender<Vec<u8>>,
+fn get_consumers(
     device_to_host_sender: &broadcast::Sender<Vec<u8>>,
-) -> Vec<Box<dyn Provider>> {
+) -> Vec<Box<dyn Consumer>> {
     return vec![
-        TimeProvider::new(host_to_device_sender.clone()),
-        VolumeProvider::new(host_to_device_sender.clone()),
-        LayoutProvider::new(host_to_device_sender.clone()),
-        RelayProvider::new(host_to_device_sender.clone(), device_to_host_sender.clone()),
+        EncoderConsumer::new(device_to_host_sender.clone()),
     ];
 }
 
@@ -109,6 +110,7 @@ fn start(
     mut is_connected_receiver: mpsc::Receiver<bool>,
 ) {
     let providers = get_providers(&host_to_device_sender, &device_to_host_sender);
+    let consumers = get_consumers(&device_to_host_sender);
 
     let mut connected_count = 0;
     let mut is_started = false;
@@ -123,6 +125,7 @@ fn start(
                 tracing::info!("Stopping providers");
                 is_started = false;
                 providers.iter().for_each(|p| p.stop());
+                consumers.iter().for_each(|p| p.stop());
                 std::thread::sleep(std::time::Duration::from_millis(200));
             }
 
@@ -130,6 +133,7 @@ fn start(
                 tracing::info!("Starting providers");
                 is_started = true;
                 providers.iter().for_each(|p| p.start());
+                consumers.iter().for_each(|p| p.start());
             }
         }
     }

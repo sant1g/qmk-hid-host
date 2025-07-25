@@ -1,3 +1,4 @@
+use std::mem::size_of_val;
 use block2::{Block, RcBlock};
 use coreaudio::audio_unit::macos_helpers::get_default_device_id;
 use coreaudio_sys::{

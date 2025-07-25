@@ -10,13 +10,15 @@ Application is written in Rust which gives easy access to HID libraries, low-lev
 
 ## Supported platforms/providers
 
-|              | Windows            | Linux                           | MacOS              |
-| ------------ | ------------------ | ------------------------------- | ------------------ |
-| Time         | :heavy_check_mark: | :heavy_check_mark:              | :heavy_check_mark: |
-| Volume       | :heavy_check_mark: | :heavy_check_mark: (PulseAudio) | :heavy_check_mark: |
-| Input layout | :heavy_check_mark: | :heavy_check_mark: (X11)        | :heavy_check_mark: |
-| Media info   | :heavy_check_mark: | :heavy_check_mark: (D-Bus)      |                    |
-| Relay        | :heavy_check_mark: | :heavy_check_mark:              | :heavy_check_mark: |
+|              | Windows            | Linux                           | MacOS                              |
+|--------------|--------------------|---------------------------------|------------------------------------|
+| Time         | :heavy_check_mark: | :heavy_check_mark:              | :heavy_check_mark:                 |
+| Date         | :heavy_check_mark: | :heavy_check_mark:              | :heavy_check_mark:                 |
+| Volume       | :heavy_check_mark: | :heavy_check_mark: (PulseAudio) | :heavy_check_mark:                 |
+| Input layout | :heavy_check_mark: | :heavy_check_mark: (X11)        | :heavy_check_mark:                 |
+| Media info   | :heavy_check_mark: | :heavy_check_mark: (D-Bus)      | :heavy_check_mark: (media-control) |
+| Relay        | :heavy_check_mark: | :heavy_check_mark:              | :heavy_check_mark:                 |
+| System Info  | :heavy_check_mark: | :heavy_check_mark:              | :heavy_check_mark:                 |
 
 MacOS is partially supported, as I don't own any Apple devices, feel free to raise PRs.
 
@@ -35,6 +37,11 @@ typedef enum {
     _LAYOUT,
     _MEDIA_ARTIST,
     _MEDIA_TITLE,
+    _DATE,
+    _CPU_USAGE,
+    _RAM_USAGE,
+    _NETWORK_RX,
+    _NETWORK_TX,
 
     _RELAY_FROM_DEVICE = 0xCC,
     _RELAY_TO_DEVICE,
@@ -156,12 +163,19 @@ When you verified that the application works with your keyboard, you can use `qm
 
    "new layout:" is what you need
 
-4. start `qmk-hid-host` from directory where your `qmk-hid-host.json` is located
+4. Install `media-control` using homebrew:
+   ```sh
+    brew tap ungive/media-control
+   ```
+   ```sh
+    brew install media-control
+   ```
+5. Start `qmk-hid-host` from directory where your `qmk-hid-host.json` is located
 
    Note: macOS, by default, may not locate your configuration file correctly. It's recommended to start `qmk-hid-host` with the configuration file path explicitly specified, for example:
         `./qmk-hid-host -c ~/Downloads/macos/qmk-hid-host.json`
    
-5. If you `qmk-hid-host` stuck at `Waiting for keyboard...` there are two common mistakes:
+6. If you `qmk-hid-host` stuck at `Waiting for keyboard...` there are two common mistakes:
    1. You're wrong with productId in your config
    2. Close Vial app and try again
 
